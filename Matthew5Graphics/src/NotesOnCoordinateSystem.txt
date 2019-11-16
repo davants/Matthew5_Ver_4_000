@@ -1,0 +1,36 @@
+#pragma once
+
+Coordinate Systems 
+
+	////////////////////////////////////////////////////////////////
+	Right Handed (Bullet Physics default)
+		+ Y is up
+		+ X is to the right
+		+ Z is coming closer / or back behind me if I'm at 0,0,0
+
+		+Y
+		^
+		|
+		|
+	----------> +X
+	   /
+	  /
+	+Z
+
+	////////////////////////////////////////////////////////////////////
+	Left Handed (DirectX default)
+		+ Y is up
+		+ X is to the right
+		+ Z is forward
+
+			+Z
+		+Y  /
+		^  /
+		| /
+		|/
+	----------> +X
+
+
+	//////////////////////////////////////////////////////////////////////
+	Bullet Physics is Right Handed by Default
+	DirectX is Left Handed by Default

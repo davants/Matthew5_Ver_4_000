@@ -1,0 +1,10 @@
+#pragma once
+
+Triangle Mesh Clockwise and Counter Clockwise
+	This is about "Front-Facing" and "Back-Facing" triangles. 
+	If a rasterizer is set to "Clockwise", then "Front-Facing" triangles are in clockwise order 
+	in terms of their vertex points. If the rasterizer is set to "Counterclockwise" then 
+	"Front-Facing" triangles are in counterclockwise order.
+
+	DirectX uses the D3D11_RASTERIZER_DESC struct for setting things up.
+	This struct has the bool FrontCounterClockwise member so it can support either way.

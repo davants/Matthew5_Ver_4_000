@@ -1,0 +1,924 @@
+Version 4.000
+	Requirements
+		Version 3 hard codes one obj file. This version will allow the client 
+			to add different custom geometry using .obj files.
+		The client will be able to specify image/textures to scene objects.
+		The client will be able to change the direction of the camera.
+		The client will be able to update each scene object's location and
+			rotation in world space.
+	
+	
+Steps to go from Version 3.000 to Version 4.000 
+
+	ToDo - Reorganize the scene object list.
+		Currently, the client has no way to update scene objects that have been added. 
+		Before we start adding all kinds of functionality related to scene objects, we 
+		will reorganize things so that the client has one abstract class for working 
+		with the scene objects.
+	
+		Notes:
+		We will create a class that is used by the client for all CRUD operations 
+		for scene objects. (CRUD: Create, Read, Update, Delete) 
+		This will mean we will change the existing interface, moving the 
+		existing AddSceneObject function to this new class. We will also add 
+		other functions to this class for "read", "update". We will handle "delete" 
+		in a later version. Internally, logic will be added to make sure all frame 
+		resources are updated as needed. Let's get started by first doing the 
+		reorganization work.
+		
+		
+		ToDo - Create a class named IMatthew5SceneObjectList in the namespace with 
+			the other interface classes; namespaces structure is "Matthew5::Matthew5Graphics".
+			
+		ToDo - This next change will break the build for a while.
+			We will add a new pure virtual function to the IMatthew5Graphics class that returns 
+			our new IMatthew5SceneObjectList. Now that we have the scene object list in the 
+			IMatthew5Graphics, we will move the "AddSceneObject" function to the new 
+			IMatthew5SceneObjectList.
+
+			ToDo - Create a pure virtual function in IMatthew5Graphics named "GetSceneObjectList".
+				It will return a reference to a IMatthew5SceneObjectList and takes no parameters. 
+			
+			ToDo - Move the "AddSceneObject" pure virtual function from the IMatthew5Graphics class 
+				to the new IMatthew5SceneObjectList class.
+				You will need to include its header and also may need to include <cstdint> because 
+				it returns std::int32_t.
+			
+		ToDo - We now need to create a class that derives from IMatthew5SceneObjectList that 
+			implements its functionality. 
+			Create a class named M5DxSceneObjectList and have it derive from IMatthew5SceneObjectList.
+			The namespace will be the same as IMatthew5SceneObjectList.
+			Give it a constructor that takes a M5DxGpuDeviceNFactory reference, a M5DxGpuCommand 
+			reference and a M5DxFrameResources reference.
+			Add a private member that is a M5DxGpuDeviceNFactory reference named mrM5DxGpuDeviceNFactory.
+			Add a private member that is a M5DxGpuCommand reference named mrM5DxGpuCommand;
+			Add a private member that is a M5DxFrameResources reference named mrM5DxFrameResources;
+			In the M5DxSceneObjectList constructor, set the mrM5DxGpuDeviceNFactory, mrM5DxGpuCommand 
+			and the mrM5DxFrameResources with the parameters.
+			
+			Implement the virtual function "AddSceneObject" in the derived class; the function body 
+			will be empty for a bit.
+			
+			Move the mSceneObjectIdCounter from Matthew5Dx to the M5DxSceneObjectList.
+			
+		ToDo - The current implementation of the "AddSceneObject" function is in the Matthew5Dx class.
+			We will want to move that implementation into the M5DxSceneObjectList class; cut and paste.
+			Update the function body as needed. 
+			You will need to go through the function and change the variable names from "mp..", pointers, 
+			to the refernce names "mr..". Because they are now references, using them will require 
+			switching from "->" to "." where needed. 
+			
+		ToDo - Now time to add the new M5DxSceneObjectList to the Matthew5Dx class.
+			Add a unique pointer variable of type M5DxSceneObjectList, named mpM5DxSceneObjectList to 
+			the Matthew5Dx class.
+			Remember, both the Matthew5DxDesktop and the Matthew5DxOculus derive from Matthew5Dx.
+			Instantiate it in the Matthew5DxDesktop constructor, at the bottom, after the 
+			M5DxGpuDeviceNFactory, M5DxGpuCommand and M5DxFrameResources are created because you 
+			need them for the constructor.
+			If you are building the Oculus version you will need to repeat the same code in the 
+			Matthew5DxOculus constructor. 
+			Both the desktop and oculus constructors will have something like the following at the 
+			bottom.
+				CODE:
+					// Create the M5DxSceneObjectList.
+					mpM5DxSceneObjectList = std::make_unique<M5DxSceneObjectList>(
+						*mpM5DxGpuDeviceNFactory,
+						*mpM5DxGpuCommand,
+						*mpM5DxFrameResources);
+						
+		ToDo - We can now implement the virtual GetSceneObjectList(void) function in the Matthew5Dx 
+			class. The function returns a reference to the base class. So all it does is return a 
+			reference to the object being "wrapped" by the smart pointer. 
+			For a unique_ptr<..> smart pointer, you can call the "get()" function to get the 
+			underlying real address; the real pointer.
+			What I do is call the "get()" function of the smart pointer, cast it to a 
+			pointer of the base class, (IMatthew5SceneObjectList*), and then dereference it.
+			CODE:
+				return *((IMatthew5SceneObjectList*)mpM5DxSceneObjectList.get());
+
+			
+		ToDo - We now need to update the EXE client because it is used to calling the AddSceneObject 
+			function using the IMatthew5Graphics object. Since we have moved it, the client 
+			will need to call GetSceneObjectList() to get to the AddSceneObject function.
+			Update the code as needed.
+			From:
+				vpIMatthew5Graphics->AddSceneObject(... 
+			To:
+				vpIMatthew5Graphics->GetSceneObjectList().AddSceneObject(... 
+				
+		
+
+		ToDo - Compile and run.
+
+			Notice that we have not really done anything to the overall functionality. All we 
+			have done is re-organize things a little; however, we are now in a position to move 
+			forward. 
+
+
+	ToDo - In the existing program we only support one obj object file. We want the client to 
+		add as many different geometries as they want to the graphics engine. 
+		
+		This will be very easy to do. The obj file contains all the needed info about the 
+		geometry; therefore, all we have to do is add one more parameter to the existing 
+		"AddSceneObject" function. 
+		
+		ToDo - Update the AddSceneObject function signature in the base class 
+			IMatthew5SceneObjectList by adding one more parameter of type const std::string&.
+			NEW CODE:
+				virtual std::int32_t AddSceneObject(M5SceneObjectCpuPosition vM5SceneObjectCpuPosition,
+					const std::string vrGeometryDefinitionFileName) = 0;
+				
+			Update the derived class M5DxSceneObjectList so it also has the new parameter. You will have 
+			to update both the declaration and the definition of the M5DxSceneObjectList class.
+			
+		ToDo - Update the AddSceneObject definition so that the parameter value is used instead of the 
+			hard coded "ElephantBox.obj". To do this just delete the vFileName variable and replace 
+			all effected code with the new parameter vrGeometryDefinitionFileName.
+
+			You will notice that the call to the GetTriangleSetResourcesForObjFile shows as an error.
+			This is because its last parameter, the file name sting, is not a const. It should be a const 
+			because it is not updated/modified. So, update the GetTriangleSetResourcesForObjFile function 
+			signature by making the last paramter a const.
+			Note: Always make paramters const if you can; meaning if you don't edit them you should 
+				set them to const.
+
+		ToDo - Now all we have to do is pass the "ElephantBox.obj" string in the EXE client code when 
+			calling "AddSceneObject(..)".
+			In WinMain, create a std::string named vFileNameElephantBox and set it to "ElephantBox.obj".
+			Pass this new variable to the AddSceneObject function.
+		
+		ToDo - Compile and run.
+			Things should run as before; however, you can now load different geometries from the client.
+			The client is required to place all obj, and related, files in the /Matthew5ObjFiles/ directory 
+			which is located in the solution directory.
+			
+	
+	ToDo - Rotation of scene objects 
+		We will need to store some extra data in the M5SceneObjectCpuPosition struct related to rotation.
+		
+		ToDo - Add 4 floats to the M5SceneObjectCpuPosition struct after the position floats. The must be 
+			after the mPosition... properties so that data is copied over to the Gpu correctly.
+			This is the new struct.
+			CODE:
+			
+				struct M5SceneObjectCpuPosition
+				{
+					float mPositionX = 0.0f;
+					float mPositionY = 0.0f;
+					float mPositionZ = 0.0f;
+
+					float mRotationX = 0.0f;
+					float mRotationY = 0.0f;
+					float mRotationZ = 0.0f;
+					float mRotationW = 0.0f;
+				};
+			
+		ToDo - Update the M5SceneObjectGpuPosition::UpdateDataOnGpu function to use the 
+			rotation data. Here is the new function definition. At a high level, it is 
+			multiplying the position by the rotation to create the XMMATRIX.
+			CODE:
+			
+			void M5SceneObjectGpuPosition::UpdateDataOnGpu(M5SceneObjectCpuPosition & vrM5SceneObjectCpuPosition)
+			{			
+				// The M5SceneObjectPrepareGpuData class has data layed out in the exact same 
+				// way as the cooresponding Shader variable named "cbPerObject".
+				// So first update our Cpu "Prepare" object and then copy to the Gpu.
+
+				// Update our "Prepare" for Gpu object.
+				//XMMATRIX vXMATRIXWorldSpace = XMMatrixTranslation(
+				//	vrM5SceneObjectCpuPosition.mPositionX, vrM5SceneObjectCpuPosition.mPositionY, vrM5SceneObjectCpuPosition.mPositionZ);
+
+				XMFLOAT4 vXMFLOAT4Rotation(vrM5SceneObjectCpuPosition.mRotationX,
+					vrM5SceneObjectCpuPosition.mRotationY,
+					vrM5SceneObjectCpuPosition.mRotationZ,
+					vrM5SceneObjectCpuPosition.mRotationW);
+
+				XMMATRIX vXMATRIXWorldSpace = XMMatrixMultiply(
+					XMMatrixRotationQuaternion(XMLoadFloat4(&vXMFLOAT4Rotation)),
+					XMMatrixTranslation(
+						vrM5SceneObjectCpuPosition.mPositionX,
+						vrM5SceneObjectCpuPosition.mPositionY,
+						vrM5SceneObjectCpuPosition.mPositionZ));
+					
+				XMStoreFloat4x4(&mM5SceneObjectPrepareGpuData.mWorldSpace, XMMatrixTranspose(vXMATRIXWorldSpace));
+
+				// Now copy to Gpu.  This is actually copying the data over at this moment!
+				// At this moment means Now! Notice in the "Update(..)" function there is 
+				// no command list being used, just memcpy.
+				mpM5DxGpuMemoryUploadBuffer->Update(&mM5SceneObjectPrepareGpuData);			
+			}
+			
+			
+	ToDo - We currently don't have a way for the client to update scene object's position and rotation.
+		The client can add an object, but can not changes its location at a later time.
+	
+		So what is involved with updating data and keeping track of things across 4 frame resources?
+		
+		We already have the code in place to update frame resource for scene objects; however, we 
+		don't have a way to keep track of what frame resources have old data.
+		
+		When an update is done to one of the frame resources, it must be repeated to all 
+		the other 3 frame resources; otherwise the scene object will move and then move back!
+		Also, if it is moving for each draw, say a ball falling, we will always use the latest 
+		ball position and rotation data, continually update each current frame resource.
+		Example 1, say a box moves during one frame draw call and then stops. 
+			For the next draw, we want to update things. 
+			We first move to the next frame resource which becomes the new current frame resource.
+			We will want to update the new current frame resource with the new box position and rotation
+			and then repeate the same position and rotation data for the next 3 (draw and frame resources)
+			otherwise the box will go back on the next draw. If we don't update the next 3 frame resource, 
+			3 out of 4 draws it will be in the old position and rotation.
+		Example 2, say to box moves during the next 100 draw calls because it is falling and bouncing 
+			around. 
+			In this case we want to use the most recent position and rotation for each frame resource 
+			update.
+			
+		Requirements			
+			The client can call add and update as many times as they want to. 
+			Then they call draw.
+		
+		Design
+			Each time the client updates a scene object, an int named UpdateCounter is incremented and the 
+			Cpu and Gpu scene object data is updated. As each scene object is drawn, the UpdateCouter value 
+			is compaired to the previous frame resource's cpu data.  
+			There are 3 paths depending on if they are equal, greater than or less than compaired to each other.
+			
+			
+			Cpu int "UpdateCounter" compair of current and previous permutations
+			
+				UpdateCounter Current == UpdateCounter Previous
+					If the previous cpu frame resource is equal to the current cpu frame resource then both of the 
+					cooresponding Gpu scene item data are the same and therefore nothing needs to be updated.
+					As a result, do nothing.
+				UpdateCounter Current < UpdateCounter Previous 
+					If the current is less than the previous then that means the client has stopped updating and 
+					this current frame resource need to be updated with the previous's value. 
+					Update the current with the previous, Cpu and Gpu.
+					Set the UpdateCounter of current to the same value as the previous to mark it as equal with 
+					the previous.
+				UpdateCounter Current > UpdateCounter Previous 
+					This means that the client called update for this scene item and therefore the Gpu has been 
+					updated with a new value from the client. The previous frame resource is old and should 
+					not be used. 
+					As a result, do nothing.
+					
+				So..
+					if UpdateCounter Current >= UpdateCounter Previous 
+						Do Nothing 
+					else 
+					{
+						Update Current frame resource using the previous 
+						Set the UpdateCounter Current to the same value as Previous UpdateCounter.
+					}	
+				
+				OR...
+				
+					if UpdateCounter Current < UpdateCounter Previous 
+					{
+						Update Current frame resource using the previous 
+						Set the UpdateCounter Current to the same value as Previous UpdateCounter.
+					}	
+					else 
+						Do Nothing
+				
+				
+		ToDo - After reviewing the design, we need a way to the frame resource we care about easly and 
+			consistantly. Frame resources are accesssed by an index id that can be from 0 to 3. This will 
+			not change; however, we can add some helper functions to get the index we care about without 
+			changing what the system says is the current index.
+			
+			The M5DxFrameResources class already has a simple function, GetAvailableFrameResourceIndex(), that 
+			gives use the current frame resource index. Now lets add the following 2 functions.
+			
+				// Given an index value that is from 0 through 3 as a parameter, what is the previous value.
+				int GetPreviousIndex(int vIndex);
+								
+				// Given an index value that is from 0 through 3 as a parameter, what is the Next value.
+				int GetNextIndex(int vIndex);
+		
+			ToDo - Add a function to the M5DxFrameResources class that takes an int and returns what the 
+				previous frame resource index was. It will validate that it is greater than zero.
+	
+				// Given an index value that is from 0 through 3 as a parameter, what is the previous value.
+				int GetPreviousIndex(int vIndex);
+				
+				The implementation would be something like the following.
+				CODE:
+					vIndex--;
+					
+					if(vIndex < 0)
+					{
+						// vIndex was zero, so the previous was 3.
+						vIndex = 3;
+					}
+					return vIndex; 
+					
+					
+
+			ToDo - Add a function to the M5DxFrameResources class that takes an int and returns what the 
+				next frame resource index would be. It will validate that it less than or equal to 3.
+	
+				// Given an index value that is from 0 through 3 as a parameter, what is the Next value.
+				int GetNextIndex(int vIndex);
+				
+				The implementation would be something like the following.
+				CODE:
+					vIndex++;
+					
+					if(vIndex > 3)
+					{
+						// vIndex was three, so the next is zero.
+						vIndex = 0;
+					}
+					return vIndex; 
+					
+					
+			ToDo - Now that we have a way to get the previous and next frame resource index, we need a 
+				way to get at a frame resource using the index. 
+				
+				Note that we already have a way to get the "Available" or "Current" frame resource, but 
+					now we need a way to get at any of the 4 by giving an index.
+				
+				Add a function to the M5DxFrameResources class that returns a frame resource based 
+				on a given index value.
+				
+				CODE - declaration
+					M5DxFrameResource& M5DxFrameResources::GetFrameResource(int vIndex);
+				
+				CODE - definition
+					M5DxFrameResource& M5DxFrameResources::GetFrameResource(int vIndex)
+					{
+						// Dereference one of the pointers in the array and return it.
+						return *(mM5DxFrameResourceList[vIndex]);
+					}
+				
+		
+			ToDo - Code clean up
+				We have some existing code that moves the frame resource index to the next value. We 
+				can now remove that code in favor of this new code.
+				
+				ToDo - Update the M5DxSceneObjectList::AddSceneObject function where the frame resource index 
+					is moved to the next value.
+					
+					OLD CODE:
+					
+						...
+						
+						int vFrameResourceIndex = mrM5DxFrameResources.GetAvailableFrameResourceIndex();
+						vFrameResourceIndex++;
+						if (vFrameResourceIndex > 3)
+						{
+							vFrameResourceIndex = 0;
+						}
+
+						mrM5DxFrameResources.SetAvailableFrameResourceIndex(vFrameResourceIndex);
+						
+						...
+					
+					NEW CODE:
+						...
+						
+						int vFrameResourceIndex = mrM5DxFrameResources.GetNextIndex(
+							mrM5DxFrameResources.GetAvailableFrameResourceIndex());
+
+						mrM5DxFrameResources.SetAvailableFrameResourceIndex(vFrameResourceIndex);
+					
+						...
+					
+					This new code does basically the same thing. So why change it? It is always good to get rid of 
+					duplicate code if you can. Having all clients of the M5DxFrameResources class do things the 
+					same way will ensure mistakes are not made.
+					
+				ToDo - The Matthew5DxDesktop::Draw function also has "old code" that needs to be replaced.
+					
+				ToDo - The Matthew5DxOculus::Draw function also has "old code" that needs to be replaced.
+				
+			ToDo - Compile and run.
+				Things should work as before.
+				
+		ToDo - More clean up 
+			Notice that both the Matthew5DxDesktop::Draw and the Matthew5DxOculus::Draw functions both start with 
+			the same code that moves to the next resource. This can be placed in a function in the base 
+			class Matthew5Dx.  
+
+			ToDo - Create a function in the base class Matthew5Dx called "MoveToNextFrameResource". It will take 
+				no parameters and return an int which is the new frame resource index; just in case it is needed 
+				by some other process.
+				
+				Move the code that changes to the next frame resource and waits for it to be available. 
+				Move it from Matthew5DxDesktop::Draw to the new function.
+				
+				CODE TO MOVE:
+					
+					
+					// Set the next available frame resource.
+					int vFrameResourceIndex = mpM5DxFrameResources->GetNextIndex(
+						mpM5DxFrameResources->GetAvailableFrameResourceIndex());
+
+					mpM5DxFrameResources->SetAvailableFrameResourceIndex(vFrameResourceIndex);
+
+					// Validate it is available.
+					mpM5DxFrameResources->GetAvailableResource().WaitForFence();
+
+					
+				In the Matthew5Dx class declaration, add the new function declaration in the 
+				protected area.		
+				
+					NEW CODE					
+					
+						int MoveToNextFrameResource(void);
+					
+				Create the definition of this new function and place the code that moves to the 
+				next frame resource and waits for it to be available.
+				
+					NEW CODE 
+						int Matthew5Dx::MoveToNextFrameResource(void)
+						{
+							// Set the next available frame resource.
+							int vFrameResourceIndex = mpM5DxFrameResources->GetNextIndex(
+								mpM5DxFrameResources->GetAvailableFrameResourceIndex());
+
+							mpM5DxFrameResources->SetAvailableFrameResourceIndex(vFrameResourceIndex);
+
+							// Validate it is available.
+							mpM5DxFrameResources->GetAvailableResource().WaitForFence();
+							
+							return vFrameResourceIndex;
+						
+						}
+						
+			ToDo - Now call this new function, MoveToNextFrameResource, at the beginning of 
+				the Draw function for both Matthew5DxDesktop and Matthew5DxOculus.
+				
+				OLD CODE:
+
+					// Set the next available frame resource.
+					int vFrameResourceIndex = mpM5DxFrameResources->GetNextIndex(
+						mpM5DxFrameResources->GetAvailableFrameResourceIndex());
+
+					mpM5DxFrameResources->SetAvailableFrameResourceIndex(vFrameResourceIndex);
+
+					// Validate it is available.
+					mpM5DxFrameResources->GetAvailableResource().WaitForFence();
+
+				NEW CODE: 
+				
+					int vFrameResourceIndex = MoveToNextFrameResource();
+
+			ToDo - Compile and test
+				Things should work as before.
+				
+		A little more cleanup and re-organization
+		
+			Up until now, we have added scene objects but not updated them. In our loop we 
+			call draw over and over.
+		
+			If the client updates scene objects BEFORE calling draw, we will need to make sure they 
+			are updating resources that are not being used by the Gpu.
+			
+			From the client's perspecitve, the following is done.
+			
+				// Pseudocode
+				Update scene objects, say 10 scene object locations.
+				Call Draw()
+			
+			Now if we add the code that moves to the next frame resource, what does 
+			the above Pseudocode look like?
+			 
+				// Pseudocode
+				Update scene objects, say 10 scene object locations.
+				Call Draw()
+					Move to next frame resourse and wait, using the fence, for it to be available.
+					draw scene items
+	
+			Notice that "move to next frame resource and wait..." is between 
+			the update of scene resources and draw scene items. This means that we would be updating 
+			things for a different frame than the draw. 
+			The real issue is that the client is updating Gpu resources that have not been cleared by 
+			the fence.
+	
+			We need to move to the next available frame resource right after draw is done. This will 
+			ensure that the updates and draw recording are working on the same frame resourse.
+
+			ToDo - Move the call to "int vFrameResourceIndex = MoveToNextFrameResource();" to the last 
+				thing that the draw function does for both Matthew5DxDesktop and Matthew5DxOculus.
+				It should go right after the call ...
+					mpM5DxFrameResources->GetAvailableResource().SetTheFence();
+
+				For example, the desktop draw function will look someting like this.
+				
+					void Matthew5DxDesktop::Draw(IMatthew5DrawInstructions & vrIMatthew5DrawInstructions)
+					{
+						Update(vrIMatthew5DrawInstructions);
+
+						DrawScene();
+
+						// Add a fence now that all the commands have been added to the queue.
+						mpM5DxFrameResources->GetAvailableResource().SetTheFence();
+
+						int vFrameResourceIndex = MoveToNextFrameResource();
+					}
+				
+				For Oculus, the draw is much longer function, but the same thing should happen. Place the 
+				MoveToNextFrameResource right after the call to 
+				"mpM5DxFrameResources->GetAvailableResource().SetTheFence();" at the bottom of the draw 
+				function.
+				
+				
+			ToDo - Notice the int variable vFrameResourceIndex.
+			
+				For Desktop this is not needed, as you can see if it never used. You can just call 
+				MoveToNextFrameResource	without keeping the return value. Meaning, you can get rid of 
+				vFrameResourceIndex.
+				
+				For example, the desktop draw function will look someting like this.
+				
+					void Matthew5DxDesktop::Draw(IMatthew5DrawInstructions & vrIMatthew5DrawInstructions)
+					{
+						Update(vrIMatthew5DrawInstructions);
+
+						DrawScene();
+						
+						
+						
+						// Note that below we set a fence and then move to another frame resource 
+						// and wait for that fence; however, they are not the same fence. So, this 
+						// means the fence we set here is not the one we are waiting on in the 
+						// call to "MoveToNextFrameResource".						
+
+						// Add a fence now that all the commands have been added to the queue.
+						mpM5DxFrameResources->GetAvailableResource().SetTheFence();
+
+						MoveToNextFrameResource();
+					}
+					
+			
+				For Oculus! 
+					First, like the Desktop we don't need to keep the value returned by MoveToNextFrameResource.
+					
+					Oculus does need the "int vFrameResourceIndex" set at the top of the draw function; however, it 
+					is now gone. 
+					"vFrameResourceIndex" needs to be set at the front of the Oculus draw function 
+					so add the following to the top of the Oculus draw function.
+					
+					
+					
+					
+					// Note that below we set a fence and then move to another frame resource 
+					// and wait for that fence; however, they are not the same fence. So, this 
+					// means the fence we set here is not the one we are waiting on in the 
+					// call to "MoveToNextFrameResource".											
+					
+					int vFrameResourceIndex = mpM5DxFrameResources->GetAvailableFrameResourceIndex();
+					
+					This does not move to the next frame resourse, just gets the current one.
+					
+					
+			
+			ToDo - Compile and run.
+			
+			
+		ToDo - Now that we have re-organized things a bit, needed if we are going to give the client 
+			the ability to update, we are ready to expost update ability. 
+			When the client added a scene object we gave then an int id. The client will use this 
+			id for all updates.
+			Our scene object list allows access by index which is the same as the id. Therefore, updates 
+			are done without having to loop through all the scene objects to find the one they are updating.
+			
+			We have three things to do.
+			
+				One, Add an UpdateCounter to the scene object so we can keep track of which frame resources 
+					are out of date; meaning, they have old data.
+			
+				Two, give the client access to update the scene object. 
+					Note that when the client updates it happens imediately on the availabe frame resourse. 
+					The update does not use the command queue. However, it only updates the available, 
+					"current", frame resourse and there are 3 more. If the client is updating a scene object's 
+					location for every frame because it is falling then everything is fine; however, as soon 
+					as it stops moving/falling there are 3 more frames that will be out of date.
+				
+				Three, add logic that checks if a frame resource's scene object is out of date and need to 
+				be updated.
+					As mentioned above, a scene object's location is out of date if it was moving and then 
+					stopped. The last update has to be copied to the next 3 frame resources so they are 
+					all in-sync.
+			
+			ToDo - Add UpdateCounter to the scene object. 
+			
+				ToDo - Add an unsigned int private member named mUpdateCounter, type is uint64_t, to the 
+					M5DxSceneObjectList class. Initialize it to zero in the constructor.
+					This one will be the root update int that keeps all the others unique and always moving 
+					up. Meaning, each every update for for every scene object will always get a higher, unique,
+					int value.
+					
+				ToDo - Add an unsigned int private member named mUpdateCounter, type is uint64_t, to the 
+					M5SceneObject class. Initialize it to zero in the constructor.
+					This one will be set, after each update, using the one in the M5DxSceneObjectList class.
+					
+				ToDo - Add a "Get.." funtion to the M5SceneObject class that returns a const reference to the 
+					mUpdateCounter.
+					
+				ToDo - Add the following code to the M5DxSceneObjectList::AddSceneObject function at the top.
+					CODE:
+						mUpdateCounter++;
+
+					
+				ToDo - Add a parameter to the M5SceneObject::UpdatePosition function so that the 
+					mUpdateCounter variable can be set with the latest value. The parameter name 
+					can be something like "vUpdateCounter".
+					
+					Using this parameter, set the mUpdateCounter private variable in the M5SceneObject.
+						
+						CODE: 
+							mUpdateCounter = vUpdateCounter;
+							
+				
+
+				ToDo - Update the M5DxSceneObjectList::AddSceneObject function where the scene object 
+					is updated. We just changed the M5SceneObject::UpdatePosition function so it now 
+					needs the int counter.
+				
+					OLD CODE:
+						vpSimpleM5SceneObjectTriangle->UpdatePosition(vM5SceneObjectCpuPosition);
+
+					NEW CODE:
+						vpSimpleM5SceneObjectTriangle->UpdatePosition(vM5SceneObjectCpuPosition,
+							mUpdateCounter);
+			
+			ToDo - Now its time to add a new function to the main IMatthew5SceneObjectList interface 
+				that will be used to update scene object's data on the Gpu.
+				
+				Add a pure virtual function to the IMatthew5SceneObjectList interface. 
+				CODE:
+					// Update an existing scene object.
+					virtual void UpdateSceneObject(std::int32_t vSceneObjectId,
+						M5SceneObjectCpuPosition vM5SceneObjectCpuPosition) = 0;
+
+				ToDo - Now that we have a pure virtual function, we must add an implementation to the 
+					derived class "M5DxSceneObjectList". 
+					
+					Add the function declaration and the empty definition.
+					
+				ToDo - The M5DxSceneObjectList::UpdateSceneObject definition is simple. It calls 
+					the scene object's update method for the available, current, frame resourse. 
+					
+					CODE: 
+						void M5DxSceneObjectList::UpdateSceneObject(std::int32_t vSceneObjectId, 
+							M5SceneObjectCpuPosition vM5SceneObjectCpuPosition)
+						{
+							// Increment the update counter so each frame resource scene object will always 
+							// have a higher value. This is used during the draw process to make sure 
+							// each frame resource has the latest data.
+							mUpdateCounter++;
+
+							// Using the "Current Frame Resource", get the scene object.
+							M5DxFrameSceneObject& vrFrameSceneObject = 
+								mrM5DxFrameResources.GetAvailableResource().GetSceneObjectList().GetM5DxFrameSceneObject(vSceneObjectId);
+
+							// Update the scene object giving it the newly updated counter.
+							vrFrameSceneObject.GetM5SceneObject().UpdatePosition(vM5SceneObjectCpuPosition,
+								mUpdateCounter);
+						}
+						
+				
+			ToDo - Last we need to add logic that checks each each scene object as it is being drawn and see if 
+				it needs to be updated with the previous frame resouce's data. 
+				
+				This code gets the previous frame resource index and uses it to get the previous frame resource 
+				and scene object.
+				
+				We will start with the Desktop. We will update the Matthew5DxDesktop::DrawSceneObjects function.
+				This function has a for loop to go through all the scene objects and record their draw steps.
+				The following is just the beginning of the for loop because the rest of it is the same.
+				
+				OLD CODE:
+					for (size_t vIndex = 0; vIndex < mpM5DxFrameResources->GetAvailableResource().GetSceneObjectList().GetSize(); vIndex++)
+					{
+
+						// Get the currently available scene object.
+						M5SceneObject & vrM5SceneObject = mpM5DxFrameResources->GetAvailableResource().GetSceneObjectList().GetM5DxFrameSceneObject(vIndex).GetM5SceneObject();
+
+				
+				NEW CODE:
+				
+					for (size_t vIndex = 0; vIndex < mpM5DxFrameResources->GetAvailableResource().GetSceneObjectList().GetSize(); vIndex++)
+					{
+						// Check to see if the previous frame resource scene object has a newer update.
+						int vPreviousFrameResourceIndex = mpM5DxFrameResources->GetPreviousIndex(
+							mpM5DxFrameResources->GetAvailableFrameResourceIndex());
+
+						// Get a reference to the previous scene object.
+						M5SceneObject& vrPreviousM5SceneObject = mpM5DxFrameResources->GetFrameResource(vPreviousFrameResourceIndex).GetSceneObjectList().GetM5DxFrameSceneObject(vIndex).GetM5SceneObject();
+
+						// Get the currently available scene object.
+						M5SceneObject & vrM5SceneObject = mpM5DxFrameResources->GetAvailableResource().GetSceneObjectList().GetM5DxFrameSceneObject(vIndex).GetM5SceneObject();
+
+
+						// Does the currently available scene object need to be updated using the previous 
+						// scene object?
+
+						if (vrM5SceneObject.GetUpdateCounter() < vrPreviousM5SceneObject.GetUpdateCounter())
+						{
+							// The previous scene object is newer than this one we are about to draw, so 
+							// update the one we are about to draw!
+
+							vrM5SceneObject.UpdatePosition(vrPreviousM5SceneObject.GetM5SceneObjectCpuAndGpuPosition().mM5SceneObjectCpuPosition,
+								vrPreviousM5SceneObject.GetUpdateCounter());
+
+						}
+
+						
+		ToDo - Use Bullet Physics for position and rotation.
+
+			We no longer need the x,y,z position we have been using. Without going into too much detail, 
+			rotation and position data are stored in a 4x4 matrix of floats. 
+			Up until now we have been using this; however, we have been doing some math to 
+			populate the 4x4 matrix. Bullet Physics does this for us.
+			
+			Update the M5SceneObjectCpuPosition and remove the position members and replace with a 4x4 matrix 
+			as follows.
+			
+			
+			
+			// 11 means row one, column one.
+			// 12 means row one, column two.
+			// 21 means row two, column one.
+			// etc....
+
+			float m11, m12, m13, m14;
+			float m21, m22, m23, m24;
+			float m31, m32, m33, m34;
+			float m41, m42, m43, m44;
+			
+		ToDo - We will now once again update the M5SceneObjectGpuPosition::UpdateDataOnGpu function.
+			Now that bullet is doing all the transformation work, this function changes substancially.
+			It is now very simple.
+			
+			New Definition:
+			
+			void M5SceneObjectGpuPosition::UpdateDataOnGpu(M5SceneObjectCpuPosition & vrM5SceneObjectCpuPosition)
+			{			
+				// The M5SceneObjectPrepareGpuData class has data layed out in the exact same 
+				// way as the cooresponding Shader variable named "cbPerObject".
+
+				memcpy(&mM5SceneObjectPrepareGpuData.mWorldSpace, &vrM5SceneObjectCpuPosition, sizeof(DirectX::XMFLOAT4X4));
+
+				// Now copy to Gpu.  This is actually copying the data over at this moment!
+				// At this moment means Now! Notice in the "Update(..)" function there is 
+				// no command list being used, just memcpy.
+				mpM5DxGpuMemoryUploadBuffer->Update(&mM5SceneObjectPrepareGpuData);			
+			}			
+				
+
+						
+		ToDo - Now let's look at the client code that will update this new data layout. 
+			As we add scene objects to the Matthew5 toy engine, we add objects to the bullet world.
+			This way the index position will be the same. This allows us to loop through the 
+			objects in the bullet world and call the Matthew5 update function "UpdateSceneObject(..)".
+
+			I will not go into all the details of adding objects to the bullet world and to Matthew5, 
+			you can review the "Source.cpp" file for that. However, I will give a high level overview 
+			of what you find in the "Source.cpp" file. Remember, the Source.cpp code uses all 3 APIs
+			now; Matthew5Windows, Matthew5Graphics and Bullet Physics. The Matthew5 are toy projects; 
+			however, bullet is a production level open source solution that is used in many games.
+			
+			You will also see "bullet step logic" code. I will not go into much detail on this but 
+			I will cover the basic idea. Bullet has a function called "stepSimulation". This function 
+			"runs" the physics simulation so that objects fall, bounce, hit each other and so on.
+			We call the stepSimulation function once before each draw call so we can udpate each 
+			scene object's position. The stepSimulation function does NOT move each object a fixed 
+			amount, like 1 millimeter. This would not work because some games might run at 100 frames 
+			per second and others at 60. In the first case things might move too fast and in the 
+			second too slow. We want objects in the world to move based on how much time has passed 
+			and let bullet physics figure out where they would be after that much time. So in our 
+			code we calculate how much time has passed sinse the last time we called stepSimulation 
+			and pass that "time passed" value to stepSimulation.
+			
+			
+			
+			High Level Overview of Source.cpp file.  Source.cpp has comments as well.  
+
+			
+			ChooseOculusOrDesktop function definition 
+			{
+				...
+			}
+			
+			AddRigidBody helper function 
+			{
+				...
+			}
+			
+			AddGround helper function
+			{
+				...
+			}
+			
+			WinMain 
+			{				
+				Create the Bullet Physics API objects.
+				Create Matthew5 APIs objects.				
+				Create the time variables we will use to calculate time passage.
+				Start the infinite while loop.
+				
+				While Loop (infinite)
+				{
+					Calculate time passage.
+					
+					Call bullet stepSimulation with the time since the last call.
+					
+					
+					Loop through each bullet object in the bullet world 
+					{
+						Update the cooresponding Matthew5 scene object.						
+					}
+				
+					Check for user keyboard input using Matthew5Windows and update/react as needed.
+					
+						One of the keyboard inputs checks now looks if 'i' is clicked.
+						
+							If so, scene objects are added to the bullet and Matthew5.
+							
+							Add objects to the Bullet world and Matthew5 in parallel so their index 
+							position will match.
+
+					
+				}
+					
+				shutdown application.
+			
+			
+			
+			
+	ToDo - Compile and run	
+			
+		Notice that the objects roll around in an odd way. This is because the Bullet Physics rigid 
+		bodies we used are spheres and not the actual shape of the "elephant box". 
+		This should make it clear that the 2 APIs are completly seperate. Matthew5 just draws, 
+		nothing else. In a future version we will create Bullet rigid bodies that match the 
+		shape of the obj file. But for now, its fun to see things finally moving around and 
+		bouncing off each other and so on.
+		
+		
+	ToDo - The next step is a big one. Ray Tracing. 
+	
+		ToDo - Determin ray tracing support by the Gpu.
+		
+			Some new code has been added to the M5DxGpuDeviceNFactory, basically this has been re-organized 
+			a bit. Ray tracing checks are done and also the 2 constructors, one that searches for a specific 
+			LUID and one that searches for a video adaptor LUID based on the one that has the most 
+			memory. The LUID is an adaptor identifier, so for the Oculus code we ask Oculus for the LUID and 
+			then create the M5DxGpuDeviceNFactory passing the LUID. For desktop, no LUID is passed so the factory 
+			will just loop through all adaptors and set the LUID based on which one has the most video 
+			memory. 
+			
+			I am not going to step through all this code, but the changes are limited to the two files.
+				M5DxGpuDeviceNFactory.h 
+				M5DxGpuDeviceNFactory.cpp 
+				
+			You can compair and constract the previous version.
+			
+			The main reason for re-organization is to add the check for ray casting support as seen in 
+			the void SetRayTracingTier_1_0(void) function. 
+		
+			A couple of functions were added to the M5DxGpuDeviceNFactory class so the client can get 
+			the video memory size in gigs and determin if the Gpu supports ray tracing.
+
+				double GetDedicatedVideoMemoryInGigs(void);
+				bool HasGpuRayTracingTier1_0(void);
+	
+		
+		
+		
+		
+		
+		
+		
+			https://github.com/microsoft/DirectX-Specs/blob/master/d3d/Raytracing.md#D3D12_RAYTRACING_TIER
+			
+		
+			
+	
+			
+		
+Side Step - Study the rotation math.  
+				VectorMultiplicationPosRotCam.txt
+		
+						
+
+			
+			
+!!! TODO - BUG FIX!!! - DON'T DELETE - TODO on previous versions!!
+			The scene object id was not initialized at -1, it was initialized at zero. Therefore, 
+			after incrementing when adding a scene object, the first index was 1, not 0.
+			
+			This should be fixed on previous versions.
+				
+	
+	
+	
+	
+
+	
+		
+			

@@ -1,0 +1,10 @@
+Blender Export Instructions
+
+Export settings
+	Triangulate Faces 
+	Vertext order Off (for this test)
+	Up set to Y
+	Forward set to -Z (for this test)	
+
+Matthew5 is Right handed coordinates which means negative z forward.
+
